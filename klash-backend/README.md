@@ -1,38 +1,62 @@
 # Klash Backend
 
-NestJS backend for Klash application with Twitter API integration.
+NestJS backend for Klash application with Twitter integration and prediction markets.
 
 ## Features
 
+### Twitter Integration
 - Twitter API integration for:
   - Searching tweets
   - Getting user profiles
   - Fetching trending topics
+  - Detecting controversial tweets
+  - Monitoring influencers
+  - Analyzing sentiment from tweet replies
+
+### Prediction Markets
+- Automated market creation for controversial tweets
+- Market resolution based on sentiment analysis
+- Integration with Aptos blockchain
+
+### Core Features
 - RESTful API endpoints
 - Input validation
 - Error handling
 - Environment configuration
 - Swagger API documentation
+- Scheduled tasks for automation
 
 ## Prerequisites
 
-- Node.js (v14+)
+- Node.js (v16+)
 - npm or yarn
+- Python 3.8+ (for Twitter scraping and analysis)
+- MongoDB (for data storage)
+- Aptos CLI (optional, for smart contract interaction)
 - MongoDB (local or remote)
 - Twitter API credentials
 
 ## Installation
 
 1. Clone the repository
-2. Install dependencies:
+2. Install Node.js dependencies:
    ```bash
    npm install
    ```
-3. Copy `.env.example` to `.env` and update with your configuration:
+3. Install Python dependencies:
    ```bash
-   cp .env.example .env
+   pip install -r src/python/requirements.txt
    ```
-4. Update the environment variables in `.env` file
+4. Download the SpaCy English language model:
+   ```bash
+   python -m spacy download en_core_web_sm
+   ```
+5. Create a `.env` file based on `.env.example`
+6. Set up Twitter accounts for scraping in `accounts.txt` (format: username:password:email:email_password)
+7. Start the development server:
+   ```bash
+   npm run start:dev
+   ```
 
 ## Configuration
 

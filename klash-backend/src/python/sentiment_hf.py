@@ -7,10 +7,14 @@ Uses ProsusAI/finbert model for financial sentiment analysis.
 import sys
 import json
 import logging
+import io
 from typing import List, Dict, Any, Tuple, Optional
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from transformers import pipeline
+
+# Fix Windows encoding
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # Configure logging
 logging.basicConfig(
@@ -40,12 +44,13 @@ class SentimentAnalyzer:
             logger.info("Loading FinBERT model and tokenizer...")
             self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
             self.model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
+            # Create sentiment analysis pipeline
             self.classifier = pipeline(
                 "sentiment-analysis",
                 model=self.model,
                 tokenizer=self.tokenizer,
-                device=DEVICE,
-                return_all_scores=False
+                device=0 if torch.cuda.is_available() else -1,
+                top_k=1  # Use top_k instead of return_all_scores
             )
             logger.info("FinBERT model loaded successfully")
         except Exception as e:
@@ -68,25 +73,67 @@ class SentimentAnalyzer:
             # Preprocess text
             processed_text = self.preprocess_text(text)
             
-            # Get prediction
-            result = self.classifier(processed_text)[0]
+            # Get predictions
+            predictions = self.classifier(processed_text)
             
-            # Map to our expected format
-            sentiment = result['label'].lower()
-            confidence = result['score']
+            # Process predictions
+            detailed_results = []
+            total_polarity = 0.0
+            total_confidence = 0.0
             
-            # Calculate polarity (-1 to 1)
-            if sentiment == "positive":
-                polarity = confidence
-            elif sentiment == "negative":
-                polarity = -confidence
-            else:  # neutral
-                polarity = 0.0
+            for pred in predictions:
+                # Handle single prediction case
+                if not isinstance(pred, list):
+                    pred = [pred]
+                    
+                # Get the first prediction (highest confidence)
+                if len(pred) > 0:
+                    pred = pred[0]
+                    
+                    sentiment = pred['label'].lower()
+                    confidence = float(pred['score'])
+                    
+                    # Convert sentiment to polarity (-1 to 1)
+                    if 'pos' in sentiment:
+                        polarity = 1.0
+                    elif 'neg' in sentiment:
+                        polarity = -1.0
+                    else:  # neutral or unknown
+                        polarity = 0.0
+                        
+                    total_polarity += polarity * confidence
+                    total_confidence += confidence
+                    
+                    detailed_results.append({
+                        'text': processed_text,
+                        'sentiment': sentiment,
+                        'confidence': confidence,
+                        'polarity': polarity
+                    })
+                    
+            # Calculate averages
+            sample_size = len(detailed_results)
+            if sample_size == 0:
+                raise ValueError("No valid tweets to analyze")
                 
+            avg_polarity = total_polarity / sample_size
+            avg_confidence = total_confidence / sample_size
+            
+            # Determine overall outcome
+            if avg_polarity > 0.3:
+                outcome = "POSITIVE"
+            elif avg_polarity < -0.3:
+                outcome = "NEGATIVE"
+            else:
+                outcome = "NEUTRAL"
+            
+            # Return final result
             return {
-                "sentiment": sentiment,
-                "confidence": float(confidence),
-                "polarity": float(polarity)
+                "outcome": outcome,
+                "avg_polarity": float(avg_polarity),
+                "avg_confidence": float(avg_confidence),
+                "sample_size": sample_size,
+                "detailed_sentiments": detailed_results
             }
             
         except Exception as e:

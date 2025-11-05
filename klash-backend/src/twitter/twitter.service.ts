@@ -1,14 +1,20 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
+import * as PythonShell from 'python-shell';
+import { join } from 'path';
 import { 
   Tweet, 
   UserProfile, 
   TrendingTopic, 
   TwitterApiResponse 
 } from '../common/interfaces/twitter-response.interface';
+import { Market, MarketDocument } from './schemas/market.schema';
+import { TweetAnalysis, TweetAnalysisDocument } from './schemas/tweet-analysis.schema';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
@@ -21,13 +27,19 @@ export class TwitterService {
   private readonly logger = new Logger(TwitterService.name);
   private readonly apiKey: string;
   private readonly baseUrl: string;
+  private readonly pythonPath: string;
+  private readonly pythonScriptsPath: string;
 
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    @InjectModel(Market.name) private marketModel: Model<MarketDocument>,
+    @InjectModel(TweetAnalysis.name) private tweetAnalysisModel: Model<TweetAnalysisDocument>,
   ) {
     const apiKey = this.configService.get<string>('TWITTER_API_KEY');
     const baseUrl = this.configService.get<string>('TWITTER_API_BASE_URL');
+    this.pythonPath = this.configService.get<string>('PYTHON_PATH', 'python');
+    this.pythonScriptsPath = join(process.cwd(), 'src', 'python');
     
     if (!apiKey) {
       throw new Error('TWITTER_API_KEY is not defined in environment variables');
